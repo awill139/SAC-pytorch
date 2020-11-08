@@ -14,11 +14,11 @@ class ReplayBuffer():
     def store_trans(self, state, action, reward, state_, done):
         index = self.mem_counter % self.mem_size
         
-        self.state_memory[index] = state
-        self.new_state_memory[index] = state_
-        self.action_memory[index] = action
-        self.reward_memory[index] = reward
-        self.done_memory[index] = done
+        self.state_memory[index] = torch.tensor(state, dtype = torch.float32)
+        self.new_state_memory[index] = torch.tensor(state_, dtype = torch.float32)
+        self.action_memory[index] = torch.tensor(action, dtype = torch.float32)
+        self.reward_memory[index] = torch.tensor(reward)
+        self.done_memory[index] = torch.tensor(done)
 
         self.mem_counter += 1
 

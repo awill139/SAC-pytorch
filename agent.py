@@ -29,7 +29,7 @@ class Agent():
         state = torch.tensor([obs],dtype=torch.float32).to(self.device)
         actions, _ = self.actor.sample_normal(state, reparam = False)
 
-        return actions.cpu().detach().numpy()[0]
+        return np.argmax(actions.cpu().detach().numpy()[0])
 
     def store_trans(self, state, action, reward, new_state, done):
         self.memory.store_trans(state, action, reward, new_state, done)
@@ -48,20 +48,20 @@ class Agent():
             value_state_dict[name] = tau * value_state_dict[name].clone() + \
                 (1 - tau) * target_value_state_dict[name].clone()
 
-        def save_models(self):
-            self.actor.save_checkpoint()
-            self.value.save_checkpoint()
-            self.target_value.save_checkpoint()
-            self.critic1.save_checkpoint()
-            self.critic2.save_checkpoint()
-            print('saving models')
-        def load_models(self):
-            self.actor.load_checkpoint()
-            self.value.load_checkpoint()
-            self.target_value.load_checkpoint()
-            self.critic1.load_checkpoint()
-            self.critic2.load_checkpoint()
-            print('loading models')
+    def save_models(self):
+        self.actor.save_checkpoint()
+        self.value.save_checkpoint()
+        self.target_value.save_checkpoint()
+        self.critic1.save_checkpoint()
+        self.critic2.save_checkpoint()
+        print('saving models')
+    def load_models(self):
+        self.actor.load_checkpoint()
+        self.value.load_checkpoint()
+        self.target_value.load_checkpoint()
+        self.critic1.load_checkpoint()
+        self.critic2.load_checkpoint()
+        print('loading models')
 
     def get_critic_val_log_prob(self, state, reparam):
         actions, log_probs = self.actor.sample_normal(state, reparam = False)

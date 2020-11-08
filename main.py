@@ -1,6 +1,11 @@
 # import pybullet_envs
 import gym
 import numpy as np
+#if OSX
+from sys import platform
+if platform == 'darwin':
+    import matplotlib  
+    matplotlib.use('TkAgg')  
 import matplotlib.pyplot as plt
 from agent import Agent
 
@@ -11,7 +16,7 @@ if __name__ == '__main__':
     agent = Agent(input_dims = env.observation_space.shape, env = env,
                   n_actions = env.action_space.n)
 
-    n_games = 250 
+    n_games = 1000
     best_score = env.reward_range[0]
     score_hist = []
     load_checkpoint = False
@@ -46,5 +51,5 @@ if __name__ == '__main__':
         x = np.linspace(0, n_games, len(score_hist))
         plt.plot(x, score_hist)
         plt.xlabel('number of games')
-        plt.y_label('score')
-        plt.show()
+        plt.ylabel('score')
+        plt.savefig('test.png')

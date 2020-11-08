@@ -1,0 +1,1 @@
+Simplistic soft actor critic on gym environment. It doesn't seem to perform we well as I would like (very low score) so some debugging is needed.
