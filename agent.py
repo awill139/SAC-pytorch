@@ -47,6 +47,8 @@ class Agent():
         for name in value_state_dict.keys():
             value_state_dict[name] = tau * value_state_dict[name].clone() + \
                 (1 - tau) * target_value_state_dict[name].clone()
+            
+        self.target_value.load_state_dict(value_state_dict)
 
     def save_models(self):
         self.actor.save_checkpoint()
