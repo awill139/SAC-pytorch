@@ -1,4 +1,4 @@
-# import pybullet_envs
+import pybullet_envs
 import gym
 import numpy as np
 #if OSX
@@ -11,12 +11,12 @@ from agent import Agent
 
 
 if __name__ == '__main__':
-    env = gym.make('CartPole-v1')
+    env = gym.make('InvertedPendulumBulletEnv-v0')
     # import pdb; pdb.set_trace()
     agent = Agent(input_dims = env.observation_space.shape, env = env,
-                  n_actions = env.action_space.n)
+                  n_actions = env.action_space.shape[0])
 
-    n_games = 1000
+    n_games = 250
     best_score = env.reward_range[0]
     score_hist = []
     load_checkpoint = False

@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from buffer import ReplayBuffer
-from network import Actor, Critic, Value
+from network import ActorNetwork, CriticNetwork, ValueNetwork
 
 class Agent():
     def __init__(self, alpha = 0.0003, beta = 0.0003, input_dims = [8],
@@ -16,11 +16,11 @@ class Agent():
         self.scale = reward_scale
 
         self.memory = ReplayBuffer(max_size, input_dims, n_actions = n_actions)
-        self.actor = Actor(alpha, input_dims, n_actions = n_actions, max_action = env.action_space.n)
-        self.critic1 = Critic(beta, input_dims, n_actions = n_actions, name = 'critic1')
-        self.critic2 = Critic(beta, input_dims, n_actions = n_actions, name = 'critic2')
-        self.value = Value(beta, input_dims, name = 'value')
-        self.target_value = Value(beta, input_dims, name = 'target')
+        self.actor = ActorNetwork(alpha, input_dims, n_actions = n_actions, max_action = env.action_space.high)
+        self.critic1 = CriticNetwork(beta, input_dims, n_actions = n_actions, name = 'critic1')
+        self.critic2 = CriticNetwork(beta, input_dims, n_actions = n_actions, name = 'critic2')
+        self.value = ValueNetwork(beta, input_dims, name = 'value')
+        self.target_value = ValueNetwork(beta, input_dims, name = 'target')
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
         self.update_network_params(tau = 1)
@@ -29,7 +29,7 @@ class Agent():
         state = torch.tensor([obs],dtype=torch.float32).to(self.device)
         actions, _ = self.actor.sample_normal(state, reparam = False)
 
-        return np.argmax(actions.cpu().detach().numpy()[0])
+        return actions.cpu().detach().numpy()[0]
 
     def store_trans(self, state, action, reward, new_state, done):
         self.memory.store_trans(state, action, reward, new_state, done)
@@ -79,45 +79,52 @@ class Agent():
         if self.memory.mem_counter < self.batch_size:
             return
         
-        state, action, reward, new_state, done = self.memory.sample_buffer(self.batch_size)
+        state, action, reward, new_state, done = \
+                self.memory.sample_buffer(self.batch_size)
 
-        state = torch.tensor(state, dtype=torch.float32).to(self.device)
-        action = torch.tensor(action).to(self.device)
-        reward = torch.tensor(reward).to(self.device)
-        state_ = torch.tensor(new_state,dtype=torch.float32).to(self.device)
-        done = torch.tensor(done).to(self.device)
+        reward = torch.tensor(reward, dtype=torch.float).to(self.actor.device)
+        done = torch.tensor(done).to(self.actor.device)
+        state_ = torch.tensor(new_state, dtype=torch.float).to(self.actor.device)
+        state = torch.tensor(state, dtype=torch.float).to(self.actor.device)
+        action = torch.tensor(action, dtype=torch.float).to(self.actor.device)
 
         value = self.value(state).view(-1)
         value_ = self.target_value(state_).view(-1)
-        value[done] = 0.0
+        value_[done] = 0.0
 
-        critic_value, log_probs = self.get_critic_val_log_prob(state, reparam = False)
+        actions, log_probs = self.actor.sample_normal(state, reparam=False)
+        log_probs = log_probs.view(-1)
+        q1_new_policy = self.critic1.forward(state, actions)
+        q2_new_policy = self.critic2.forward(state, actions)
+        critic_value = torch.min(q1_new_policy, q2_new_policy)
+        critic_value = critic_value.view(-1)
 
         self.value.optimizer.zero_grad()
-
         value_target = critic_value - log_probs
         value_loss = 0.5 * F.mse_loss(value, value_target)
-        value_loss.backward(retain_graph = True)
+        value_loss.backward(retain_graph=True)
         self.value.optimizer.step()
 
-        critic_value, log_probs = self.get_critic_val_log_prob(state, reparam = True)
-
-        self.actor.optimizer.zero_grad()
-
+        actions, log_probs = self.actor.sample_normal(state, reparam=True)
+        log_probs = log_probs.view(-1)
+        q1_new_policy = self.critic1.forward(state, actions)
+        q2_new_policy = self.critic2.forward(state, actions)
+        critic_value = torch.min(q1_new_policy, q2_new_policy)
+        critic_value = critic_value.view(-1)
+        
         actor_loss = log_probs - critic_value
         actor_loss = torch.mean(actor_loss)
         self.actor.optimizer.zero_grad()
-        actor_loss.backward(retain_graph = True)
+        actor_loss.backward(retain_graph=True)
         self.actor.optimizer.step()
 
         self.critic1.optimizer.zero_grad()
         self.critic2.optimizer.zero_grad()
-
-        q_hat = self.scale * reward + self.gamma * value_
-        q1_old = self.critic1(state, action).view(-1)
-        q2_old = self.critic2(state, action).view(-1)
-        critic1_loss = 0.5 * F.mse_loss(q1_old, q_hat)
-        critic2_loss = 0.5 * F.mse_loss(q2_old, q_hat)
+        q_hat = self.scale*reward + self.gamma*value_
+        q1_old_policy = self.critic1.forward(state, action).view(-1)
+        q2_old_policy = self.critic2.forward(state, action).view(-1)
+        critic1_loss = 0.5 * F.mse_loss(q1_old_policy, q_hat)
+        critic2_loss = 0.5 * F.mse_loss(q2_old_policy, q_hat)
 
         critic_loss = critic1_loss + critic2_loss
         critic_loss.backward()

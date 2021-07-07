@@ -6,9 +6,9 @@ import torch.optim as optim
 from torch.distributions.normal import Normal
 import numpy as np
 
-class Critic(nn.Module):
+class CriticNetwork(nn.Module):
     def __init__(self, beta, input_dims, n_actions, fc1_dims = 256, fc2_dims = 256, name = 'critic', checkpoint_dir = 'temp/sac'):
-        super(Critic, self).__init__()
+        super(CriticNetwork, self).__init__()
         self.input_dims = input_dims
         self.fc1_dims = fc1_dims
         self.fc2_dims = fc2_dims
@@ -45,9 +45,9 @@ class Critic(nn.Module):
     def load_checkpoint(self):
         self.load_state_dict(torch.load(self.checkpoint_file))
 
-class Value(nn.Module):
+class ValueNetwork(nn.Module):
     def __init__(self, beta, input_dims, fc1_dims = 256, fc2_dims = 256, name = 'value', checkpoint_dir = 'temp/sac'):
-        super(Value, self).__init__()
+        super(ValueNetwork, self).__init__()
         self.input_dims = input_dims
         self.fc1_dims = fc1_dims
         self.fc2_dims = fc2_dims
@@ -81,9 +81,9 @@ class Value(nn.Module):
     def load_checkpoint(self):
         self.load_state_dict(torch.load(self.checkpoint_file))
 
-class Actor(nn.Module):
+class ActorNetwork(nn.Module):
     def __init__ (self, alpha, input_dims, max_action, fc1_dims = 256, fc2_dims = 256, n_actions = 2, name = 'actor', checkpoint_dir = 'temp/sac'):
-        super(Actor, self).__init__()
+        super(ActorNetwork, self).__init__()
 
         self.input_dims = input_dims
         self.fc1_dims = fc1_dims
@@ -109,9 +109,9 @@ class Actor(nn.Module):
 
     def forward(self, state):
         prob = self.fc1(state)
-        prob = F.relu(prob)
+        prob = F.leaky_relu(prob)
         prob = self.fc2(prob)
-        prob = F.relu(prob)
+        prob = F.leaky_relu(prob)
 
         mu = self.mu(prob)
         sigma = self.sigma(prob)
@@ -122,7 +122,10 @@ class Actor(nn.Module):
 
     def sample_normal(self, state, reparam = True):
         mu, sigma = self.forward(state)
-        prob = Normal(mu, sigma)
+        try:
+            prob = Normal(mu, sigma)
+        except:
+            import pdb; pdb.set_trace()
 
         if reparam:
             actions = prob.rsample()
@@ -131,7 +134,7 @@ class Actor(nn.Module):
 
         action = torch.tanh(actions) * torch.tensor(self.max_action).to(self.device)
         log_probs = prob.log_prob(actions)
-        log_probs = torch.log(1 - action.pow(2) + self.reparam_noise)
+        log_probs -= torch.log(1 - action.pow(2) + self.reparam_noise)
         log_probs = log_probs.sum(1, keepdim = True)
 
         return action, log_probs
