@@ -12,7 +12,7 @@ from agent import Agent
 
 if __name__ == '__main__':
     env = gym.make('InvertedPendulumBulletEnv-v0')
-    # import pdb; pdb.set_trace()
+
     agent = Agent(input_dims = env.observation_space.shape, env = env,
                   n_actions = env.action_space.shape[0])
 
